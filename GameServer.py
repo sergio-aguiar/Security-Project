@@ -7,6 +7,8 @@ from _thread import *
 
 def client_thread(socket_object, socket_address):
 
+    global global_table_id
+
     while True:
         try:
             received_data = socket_object.recv(1024)
@@ -26,6 +28,16 @@ def client_thread(socket_object, socket_address):
                         elif sock["state"] == 1:
                             reply_to_client(socket_object, received_message, sock["state"])
                             sock["state"] = 2
+                        elif sock["state"] == 2:
+                            tables.append({"id": global_table_id, "leader": socket_object.getpeername(),
+                                           "player_num": 1, "players": [socket_object.getpeername()], "open": False,
+                                           "in-game": False})
+
+                            print("[Server] Tables: %s" % str(tables))
+
+                            global_table_id += 1
+                            reply_to_client(socket_object, received_message, sock["state"])
+                            sock["state"] = 3
             else:
                 disconnect_from_client(socket_object)
         except:
@@ -39,7 +51,11 @@ def reply_to_client(client_sock, received_message, state):
                 "type": "ConnectionSuccessful"
             }
             client_sock.sendall(json.dumps(reply).encode("utf-8"))
-
+        elif state == 2:
+            reply = {
+                "type": "TableCreated"
+            }
+            client_sock.sendall(json.dumps(reply).encode("utf-8"))
     except:
         client_sock.close()
         disconnect_from_client(client_sock)
@@ -64,7 +80,7 @@ client_list = []
 # 0 - Connected
 # 1 - Awaiting Acknowledge
 # 2 - Awaiting Menu Option
-#
+# 3 - Table Created
 #
 #
 #
@@ -72,6 +88,9 @@ client_list = []
 #
 #
 game_states = []
+
+global_table_id = 0
+tables = []
 
 server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)

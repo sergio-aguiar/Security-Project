@@ -5,11 +5,10 @@ import json
 
 
 def set_server_address():
-
     host = ""
     valid_addr = False
     while not valid_addr:
-        host = input("\n[Client] Server Address: ")
+        host = input("\n[Client] Croupier Address: ")
 
         addr_split = host.split(".")
 
@@ -27,7 +26,7 @@ def set_server_address():
     port = 0
     valid_port = False
     while not valid_port:
-        port = input("[Client] Server Port: ")
+        port = input("[Client] Croupier Port: ")
 
         for digit in port:
             if not digit.isdigit():
@@ -45,10 +44,14 @@ def set_server_address():
 
 
 def client_init_menu(game_socket, host, port):
-
     option = -1
     while option != 0:
-        print("\n[Client] Welcome to the game client!\n1- Configure server address\n2- Connect to the server\n3- Exit")
+
+        print("\n[Client] Welcome to the game client!\n"
+              "1- Configure croupier address\n"
+              "2- Connect to the croupier\n"
+              "3- Exit")
+
         option = input("\nOption: ")
 
         if option == "1":
@@ -58,7 +61,7 @@ def client_init_menu(game_socket, host, port):
                 connect_to_server(game_socket, host, port)
                 break
             else:
-                print("\n[Client] Server address not configured!")
+                print("\n[Client] Croupier address not configured!")
         elif option == "3":
             print("\n[Client] Shutting down.")
             game_socket.close()
@@ -67,8 +70,35 @@ def client_init_menu(game_socket, host, port):
             print("[Client] Invalid choice! Try again.")
 
 
+def client_table_menu():
+    option = -1
+    while option != 0:
+
+        print("\n[Client] Table operations:\n"
+              "1- Create table\n"
+              "2- List open tables\n"
+              "3- Join open table\n"
+              "4- Await random table assignment\n"
+              "5- Exit")
+
+        option = input("\nOption: ")
+
+        if option == "1":
+            return 3, {"type": "CreateTable"}
+        elif option == "2":
+            return
+        elif option == "3":
+            return
+        elif option == "4":
+            return
+        elif option == "5":
+            return
+        else:
+            print("[Client] Invalid choice! Try again.")
+
+
 def connect_to_server(game_socket, host, port):
-    print("\n[Client] Connecting to server at %s:%d..." % (host, int(port)))
+    print("\n[Client] Connecting to croupier at %s:%d..." % (host, int(port)))
 
     if game_socket.connect_ex((host, int(port))) != 0:
         print("[Client] Connection failed!")
@@ -80,15 +110,16 @@ client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_host, server_port = ("", "")
 
 send_buffer = [{
-                    "type": "ConnectionRequest"
-               }]
+    "type": "ConnectionRequest"
+}]
 
 # Current step in the game
 # 0 - Requesting Connection
 # 1 - Connection Accepted
-#
-#
-#
+# 2 - Acknowledge Prepared to Send
+# 3 - No Table Joined
+# 4 - Requested Table Creation
+# 5 - Table Created (at table menu)
 #
 #
 #
@@ -112,9 +143,20 @@ client_init_menu(client_socket, server_host, server_port)
 
 while True:
 
+    if game_state == 3:
+        game_state, tmp_message = client_table_menu()
+        send_buffer.append(tmp_message)
+
     if send_buffer:
         client_socket.sendall(json.dumps(send_buffer[0]).encode("utf-8"))
         send_buffer = send_buffer[1:]
+
+        if game_state == 0:
+            game_state = 1
+        elif game_state == 2:
+            game_state = 3
+        elif game_state == 3:
+            game_state = 4
     else:
 
         read_sockets, write_socket, error_socket = select.select([client_socket], [], [])
@@ -125,30 +167,13 @@ while True:
                 received_message = sock.recv(1024)
 
                 if received_message:
-                    print("[Client] %s:%s : %s" % (sock.getpeername()[0], sock.getpeername()[1],
-                                                   received_message.decode("utf-8")))
+                    print("\n[Client] %s:%s : %s" % (sock.getpeername()[0], sock.getpeername()[1],
+                                                     received_message.decode("utf-8")))
 
-                    if game_state == 0:
-                        game_state = 1
-                        send_buffer.append({"type": "ConnectionAcknowledge"})
                     if game_state == 1:
+                        send_buffer.append({"type": "ConnectionAcknowledge"})
                         game_state = 2
-
-        # else:
-        #
-        #     tmp_message = sys.stdin.readline()
-        #
-        #     if game_state == 0:
-        #         client_message = {
-        #             "type": "ConnectionRequest"
-        #         }
-        #     elif game_state == 1:
-        #         client_message = {
-        #             "type": "ConnectionAcknowledge"
-        #         }
-        #
-        #     client_socket.sendall(json.dumps(client_message).encode("utf-8"))
-        #
-        #     sys.stdout.flush()
+                    elif game_state == 4:
+                        game_state = 5
 
 client_socket.close()
