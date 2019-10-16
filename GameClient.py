@@ -86,7 +86,7 @@ def client_table_menu():
         if option == "1":
             return 3, {"type": "CreateTable"}
         elif option == "2":
-            return
+            return 6, {"type": "RequestOpenTables"}
         elif option == "3":
             return
         elif option == "4":
@@ -120,8 +120,8 @@ send_buffer = [{
 # 3 - No Table Joined
 # 4 - Requested Table Creation
 # 5 - Table Created (at table menu)
-#
-#
+# 6 - Requested Open Table List
+# 7 - Awaiting Open Table List
 #
 #
 #
@@ -157,6 +157,8 @@ while True:
             game_state = 3
         elif game_state == 3:
             game_state = 4
+        elif game_state == 6:
+            game_state = 7
     else:
 
         read_sockets, write_socket, error_socket = select.select([client_socket], [], [])
@@ -175,5 +177,15 @@ while True:
                         game_state = 2
                     elif game_state == 4:
                         game_state = 5
+                    elif game_state == 7:
+                        open_tables = json.loads(received_message.decode("utf-8"))
+
+                        print("\nList of open tables:")
+                        for table in open_tables["openTables"]:
+                            print("Table ID: %d,\tNumber of Players: %d,\tPlayers: %s" % (table["id"],
+                                                                                          table["player_num"],
+                                                                                          table["players"]))
+
+                        game_state = 3
 
 client_socket.close()
