@@ -76,23 +76,22 @@ def client_table_menu(game_socket):
 
         print("\n[Client] Table operations:\n"
               "1- Create table\n"
-              "2- List open tables\n"
-              "3- Join open table\n"
+              "2- List joinable tables\n"
+              "3- Join table\n"
               "4- Await random table assignment\n"
               "5- Exit")
 
         option = input("\nOption: ")
 
         if option == "1":
-            table_open = is_table_open()
-            return 3, {"type": "CreateTable", "open": table_open}
+            return 3, {"type": "CreateTable"}
         elif option == "2":
-            return 6, {"type": "RequestOpenTables"}
+            return 6, {"type": "RequestJoinableTables"}
         elif option == "3":
             table_to_join = choose_table_id()
             return 8, {"type": "JoinOpenTable", "table_id": table_to_join}
         elif option == "4":
-            return
+            return 11, {"type": "JoinRandomTable"}
         elif option == "5":
             print("\n[Client] Shutting down.")
             game_socket.close()
@@ -123,20 +122,6 @@ def choose_table_id():
     return tid
 
 
-def is_table_open():
-
-    table_open = ""
-    while table_open == "":
-        table_open = input("\n[Client] Make table open to be joined? [Y/N] : ")
-
-        if table_open.upper() == "YES" or table_open.upper() == "Y":
-            return True
-        elif table_open.upper() == "NO" or table_open.upper() == "N":
-            return False
-        else:
-            print("[Client] Invalid choice! Try again.")
-            table_open = ""
-
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_host, server_port = ("", "")
 
@@ -151,12 +136,12 @@ send_buffer = [{
 # 3  - No Table Joined (at table menu)
 # 4  - Requested Table Creation
 # 5  - Table Created (at table leader menu)
-# 6  - Requested Open Table List
-# 7  - Awaiting Open Table List
-# 8  - Requesting to Join Open Table
+# 6  - Requested Joinable Table List
+# 7  - Awaiting Joinable Table List
+# 8  - Requesting to Join Table
 # 9  - Awaiting Response on Table Join
 # 10 - Table Joined (not leader)
-#
+# 11 - Requested Random Table Assignment
 #
 #
 #
@@ -169,6 +154,9 @@ send_buffer = [{
 #
 #
 game_state = 0
+
+# Id of the currently joined table. Id valued at -1 means no table joined.
+joined_table_id = -1
 
 client_init_menu(client_socket, server_host, server_port)
 
@@ -192,6 +180,7 @@ while True:
             game_state = 7
         elif game_state == 8:
             game_state = 9
+
     else:
 
         read_sockets, write_socket, error_socket = select.select([client_socket], [], [])
@@ -211,10 +200,10 @@ while True:
                     elif game_state == 4:
                         game_state = 5
                     elif game_state == 7:
-                        open_tables = json.loads(received_message.decode("utf-8"))
+                        joinable_tables = json.loads(received_message.decode("utf-8"))
 
-                        print("\nList of open tables:")
-                        for table in open_tables["openTables"]:
+                        print("\nList of joinable tables:")
+                        for table in joinable_tables["joinableTables"]:
                             print("Table ID: %d,\tNumber of Players: %d,\tPlayers: %s" % (table["id"],
                                                                                           table["player_num"],
                                                                                           table["players"]))
@@ -226,5 +215,12 @@ while True:
                             game_state = 10
                         elif decoded_message["type"] == "InvalidTable":
                             game_state = 3
+                    elif game_state == 11:
+                        decoded_message = json.loads(received_message.decode("utf-8"))
+                        if decoded_message["type"] == "NoJoinableTable":
+                            game_state = 3
+                        elif decoded_message["type"] == "RandomTableJoined":
+                            game_state = 10
+                            joined_table_id = decoded_message["table_id"]
 
 client_socket.close()
