@@ -32,13 +32,15 @@ def client_thread(socket_object, socket_address):
 
                             if received_message["type"] == "CreateTable":
                                 tables.append({"id": global_table_id, "leader": socket_object.getpeername(),
-                                               "player_num": 1, "players": [socket_object.getpeername()], "open": False,
-                                               "in-game": False})
+                                               "player_num": 1, "players": [socket_object.getpeername()],
+                                               "open": received_message["open"], "in-game": False})
 
                                 print("[Server] Tables: %s" % str(tables))
 
                                 global_table_id += 1
                                 sock["state"] = 3
+                            elif received_message["type"] == "JoinOpenTable":
+                                sock["state"] = 4
 
                             reply_to_client(socket_object, received_message, sock["state"])
 
@@ -52,21 +54,45 @@ def client_thread(socket_object, socket_address):
 
 
 def reply_to_client(client_sock, received_message, state):
+
     try:
         if state == 0:
+
             reply = {
                 "type": "ConnectionSuccessful"
             }
             client_sock.sendall(json.dumps(reply).encode("utf-8"))
+
         elif state == 2:
+
             if received_message["type"] == "RequestOpenTables":
                 reply = {"type": "ReturnOpenTables", "openTables": get_open_tables()}
                 client_sock.sendall(json.dumps(reply).encode("utf-8"))
+
         elif state == 3:
+
             reply = {
                 "type": "TableCreated"
             }
             client_sock.sendall(json.dumps(reply).encode("utf-8"))
+
+        elif state == 4:
+            tid = received_message["table_id"]
+
+            if is_joinable_open_table(tid):
+                reply = {
+                    "type": "TableJoined"
+                }
+                update_game_state_by_sock(client_sock, 5)
+
+            else:
+                reply = {
+                    "type": "InvalidTable"
+                }
+                update_game_state_by_sock(client_sock, 2)
+
+            client_sock.sendall(json.dumps(reply).encode("utf-8"))
+
     except:
         client_sock.close()
         disconnect_from_client(client_sock)
@@ -84,14 +110,29 @@ def disconnect_from_client(client_sock):
 
 def get_open_tables():
 
-    global tables
-
     open_tables = []
     for table in tables:
-        if table["open"]:
+        if table["open"] and not table["in-game"]:
             open_tables.append(table)
 
     return open_tables
+
+
+def is_joinable_open_table(tid):
+
+    for table in tables:
+        if table["id"] == tid:
+            if table["open"] and not table["in-game"]:
+                return True
+
+    return False
+
+
+def update_game_state_by_sock(sock, new_state):
+
+    for state in game_states:
+        if state["socket"] == sock:
+            state["state"] = new_state
 
 
 print("[Server] Initializing.")
@@ -104,8 +145,8 @@ client_list = []
 # 1 - Awaiting Acknowledge
 # 2 - Awaiting Menu Option
 # 3 - Table Created
-#
-#
+# 4 - Checking Open Table
+# 5 - Table Joined (not leader)
 #
 #
 #
