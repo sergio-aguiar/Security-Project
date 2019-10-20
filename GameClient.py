@@ -74,11 +74,11 @@ def client_table_menu(game_socket):
     option = -1
     while option != 0:
 
-        print("\n[Client] Table operations:\n"
+        print("\n[Client] Game lobby:\n"
               "1- Create table\n"
               "2- List joinable tables\n"
               "3- Join table\n"
-              "4- Await random table assignment\n"
+              "4- Join random table\n"
               "5- Exit")
 
         option = input("\nOption: ")
@@ -98,6 +98,35 @@ def client_table_menu(game_socket):
             sys.exit(20)
         else:
             print("[Client] Invalid choice! Try again.")
+
+
+def in_table_not_leader():
+
+    global ready_to_begin_game
+
+    option = -1
+    while option != 0:
+        menu_string = "\n[Client] Table operations:\n"\
+                      "1- Flag self as "
+
+        if ready_to_begin_game:
+            menu_string += "not ready\n"
+        else:
+            menu_string += "ready\n"
+
+        menu_string += "2- List table information\n"\
+                       "3- Leave table"
+
+        print(menu_string)
+        option = input("\nOption: ")
+
+        if option == "1":
+            ready_to_begin_game = not ready_to_begin_game
+            return 12, {"type": "ChangeReadyState", "table_id": joined_table_id, "ready": ready_to_begin_game}
+        elif option == "2":
+            return 13, {"type": "RequestTableInfo", "table_id": joined_table_id}
+        elif option == 3:
+            return 14, {"type": "LeaveTable", "table_id": joined_table_id}
 
 
 def connect_to_server(game_socket, host, port):
@@ -142,9 +171,9 @@ send_buffer = [{
 # 9  - Awaiting Response on Table Join
 # 10 - Table Joined (not leader)
 # 11 - Requested Random Table Assignment
-#
-#
-#
+# 12 - Changing ready state
+# 13 - Requesting table information
+# 14 - Requesting to leave Table
 #
 #
 #
@@ -158,12 +187,18 @@ game_state = 0
 # Id of the currently joined table. Id valued at -1 means no table joined.
 joined_table_id = -1
 
+# States whether the client is ready to start the game
+ready_to_begin_game = False
+
 client_init_menu(client_socket, server_host, server_port)
 
 while True:
 
     if game_state == 3:
         game_state, tmp_message = client_table_menu(client_socket)
+        send_buffer.append(tmp_message)
+    elif game_state == 10:
+        game_state, tmp_message = in_table_not_leader()
         send_buffer.append(tmp_message)
 
     if send_buffer:
@@ -180,6 +215,7 @@ while True:
             game_state = 7
         elif game_state == 8:
             game_state = 9
+
 
     else:
 
@@ -212,6 +248,7 @@ while True:
                     elif game_state == 9:
                         decoded_message = json.loads(received_message.decode("utf-8"))
                         if decoded_message["type"] == "TableJoined":
+                            joined_table_id = decoded_message["table_id"]
                             game_state = 10
                         elif decoded_message["type"] == "InvalidTable":
                             game_state = 3
@@ -222,5 +259,7 @@ while True:
                         elif decoded_message["type"] == "RandomTableJoined":
                             game_state = 10
                             joined_table_id = decoded_message["table_id"]
+                    elif game_state == 12:
+                        game_state = 10
 
 client_socket.close()

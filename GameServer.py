@@ -33,7 +33,7 @@ def client_thread(socket_object, socket_address):
 
                             if received_message["type"] == "CreateTable":
                                 tables.append({"id": global_table_id, "leader": socket_object.getpeername(),
-                                               "player_num": 1, "players": [socket_object.getpeername()],
+                                               "player_num": 1, "players": [[socket_object.getpeername(), False ]],
                                                "in-game": False})
 
                                 print("[Server] Tables: %s" % str(tables))
@@ -49,6 +49,15 @@ def client_thread(socket_object, socket_address):
 
                             if sock["state"] == 3:
                                 sock["state"] = 2
+                        elif sock["state"] == 5:
+                            if received_message["type"] == "ChangeReadyState":
+                                change_ready_state(socket_object, received_message["table_id"], received_message["ready"])
+                                sock["state"] = 7
+
+                            reply_to_client(socket_object, received_message, sock["state"])
+
+                            if sock["state"] == 7:
+                                sock["state"] = 5
             else:
                 disconnect_from_client(socket_object)
         except:
@@ -84,7 +93,8 @@ def reply_to_client(client_sock, received_message, state):
 
             if is_joinable_table(received_message["table_id"]):
                 reply = {
-                    "type": "TableJoined"
+                    "type": "TableJoined",
+                    "table_id": received_message["table_id"]
                 }
                 update_game_state_by_sock(client_sock, 5)
             else:
@@ -105,7 +115,7 @@ def reply_to_client(client_sock, received_message, state):
                 }
                 update_game_state_by_sock(client_sock, 2)
             else:
-                table_id_to_join = joinable_tables[random.randint(0, len(joinable_tables))]["id"]
+                table_id_to_join = joinable_tables[random.randint(0, len(joinable_tables) - 1)]["id"]
                 join_table_by_id(client_sock, table_id_to_join)
 
                 reply = {
@@ -116,6 +126,13 @@ def reply_to_client(client_sock, received_message, state):
 
             client_sock.sendall(json.dumps(reply).encode("utf-8"))
             print("[Server] Tables: %s" % str(tables))
+
+        elif state == 7:
+            reply = {
+                "type": "ReadyStateChanged"
+            }
+            print("[Server] Tables: %s" % str(tables))
+            client_sock.sendall(json.dumps(reply).encode("utf-8"))
     except:
         client_sock.close()
         disconnect_from_client(client_sock)
@@ -155,7 +172,7 @@ def join_table_by_id(client_sock, tid):
 
     for table in tables:
         if table["id"] == tid and table["player_num"] <= 4:
-            table["players"].append(client_sock.getpeername())
+            table["players"].append([client_sock.getpeername(), False])
             table["player_num"] += 1
 
 
@@ -164,6 +181,15 @@ def update_game_state_by_sock(sock, new_state):
     for state in game_states:
         if state["socket"] == sock:
             state["state"] = new_state
+
+
+def change_ready_state(sock, tid, ready):
+
+    for table in tables:
+        if table["id"] == tid:
+            for player in table["players"]:
+                if player[0] == sock.getpeername():
+                    player[1] = ready
 
 
 print("[Server] Initializing.")
@@ -179,7 +205,7 @@ client_list = []
 # 4 - Checking Open Table
 # 5 - Table Joined (not leader)
 # 6 - Attempting Random Table Assignment
-#
+# 7 - Ready State Changed
 #
 #
 game_states = []
