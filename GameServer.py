@@ -23,6 +23,9 @@ def client_thread(socket_object, socket_address):
 
                 for sock in game_states:
                     if sock["socket"] == socket_object:
+
+                        # print("State: %s" % str(sock["state"]))
+
                         if sock["state"] == 0:
                             reply_to_client(socket_object, received_message, sock["state"])
                             sock["state"] = 1
@@ -49,17 +52,6 @@ def client_thread(socket_object, socket_address):
 
                             if sock["state"] == 3:
                                 sock["state"] = 10
-                        elif sock["state"] == 10:
-                            if received_message["type"] == "ChangeReadyState":
-                                change_ready_state(socket_object, received_message["table_id"], received_message["ready"])
-                                sock["state"] = 11
-                            elif received_message["type"] == "RequestTableInfo":
-                                sock["state"] = 12
-
-                            reply_to_client(socket_object, received_message, sock["state"])
-
-                            if sock["state"] == 11 or sock["state"] == 12:
-                                sock["state"] = 10
 
                         elif sock["state"] == 5:
                             if received_message["type"] == "ChangeReadyState":
@@ -76,6 +68,26 @@ def client_thread(socket_object, socket_address):
                                 sock["state"] = 5
                             elif sock["state"] == 9:
                                 sock["state"] = 2
+
+                        elif sock["state"] == 10:
+                            if received_message["type"] == "ChangeReadyState":
+                                change_ready_state(socket_object, received_message["table_id"], received_message["ready"])
+                                sock["state"] = 11
+                            elif received_message["type"] == "RequestTableInfo":
+                                sock["state"] = 12
+                            elif received_message["type"] == "DisbandTable":
+                                sock["state"] = 13
+
+                            reply_to_client(socket_object, received_message, sock["state"])
+
+                            if sock["state"] == 11 or sock["state"] == 12:
+                                sock["state"] = 10
+                            elif sock["state"] == 14:
+                                sock["state"] = 2
+
+                        elif sock["state"] == 14:
+                            reply_to_client(socket_object, received_message, sock["state"])
+                            sock["state"] = 2
             else:
                 disconnect_from_client(socket_object)
         except:
@@ -169,6 +181,21 @@ def reply_to_client(client_sock, received_message, state):
                 "type": "TableLeft"
             }
             client_sock.sendall(json.dumps(reply).encode("utf-8"))
+
+        elif state == 13:
+            disband_table_by_id(received_message["table_id"])
+
+            reply = {
+                "type": "TableDisbanded"
+            }
+            client_sock.sendall(json.dumps(reply).encode("utf-8"))
+
+        elif state == 14:
+            reply = {
+                "type": "TableDisbanded"
+            }
+            client_sock.sendall(json.dumps(reply).encode("utf-8"))
+
     except:
         client_sock.close()
         disconnect_from_client(client_sock)
@@ -252,6 +279,17 @@ def get_table_id_by_leader_sock(sock):
             return table["id"]
 
 
+def disband_table_by_id(tid):
+
+    for table in tables:
+        if table["id"] == tid:
+            for player in table["players"]:
+                for tmp_state in game_states:
+                    if tmp_state["socket"].getpeername() == player[0]:
+                        tmp_state["state"] = 14
+            tables.remove(table)
+
+
 print("[Server] Initializing.")
 
 server_host, server_port = ("127.0.0.1", 1024)
@@ -271,8 +309,8 @@ client_list = []
 # 10 - Awaiting Table Leader Menu Option
 # 11 - Ready State Changed (Leader)
 # 12 - Requesting Table Info (Leader)
-#
-#
+# 13 - Table Disbanding
+# 14 - Removing from Disbanded Table
 #
 #
 #

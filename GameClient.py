@@ -157,7 +157,7 @@ def in_table_leader():
         option = input("\nOption: ")
 
         if option == "1":
-            return 15, {"type": "StartGame", "table_id": joined_table_id}
+            return 16, {"type": "StartGame", "table_id": joined_table_id}
         elif option == "2":
             ready_to_begin_game = not ready_to_begin_game
             tmp_state_saver = game_state
@@ -166,7 +166,7 @@ def in_table_leader():
             tmp_state_saver = game_state
             return 13, {"type": "RequestTableInfo", "table_id": joined_table_id}
         elif option == "4":
-            return 14, {"type": "LeaveTable", "table_id": joined_table_id}
+            return 15, {"type": "DisbandTable", "table_id": joined_table_id}
         else:
             print("[Client] Invalid choice! Try again.")
 
@@ -216,7 +216,7 @@ send_buffer = [{
 # 12 - Changing ready state
 # 13 - Requesting table information
 # 14 - Requesting to leave Table
-#
+# 15 - Requesting Table Disband
 #
 #
 #
@@ -307,18 +307,33 @@ while True:
                             game_state = 10
                             joined_table_id = decoded_message["table_id"]
                     elif game_state == 12:
-                        game_state = tmp_state_saver
+                        decoded_message = json.loads(received_message.decode("utf-8"))
+
+                        if decoded_message["type"] == "ReadyStateChanged":
+                            game_state = tmp_state_saver
+                        elif decoded_message["type"] == "TableDisbanded":
+                            joined_table_id = -1
+                            ready_to_begin_game = False
+                            game_state = 3
                     elif game_state == 13:
-                        decoded_message = json.loads(received_message.decode("utf-8"))["table"]
+                        decoded_message = json.loads(received_message.decode("utf-8"))
 
-                        print("\nTable ID: %d,\tNumber of Players: %d,\tPlayers: %s" % (decoded_message["id"],
-                                                                                      decoded_message["player_num"],
-                                                                                      decoded_message["players"]))
+                        if decoded_message["type"] == "ReturnTableInfo":
+                            decoded_table = decoded_message["table"]
+                            print("\nTable ID: %d,\tNumber of Players: %d,\tPlayers: %s" % (decoded_table["id"],
+                                                                                          decoded_table["player_num"],
+                                                                                          decoded_table["players"]))
 
-                        game_state = tmp_state_saver
-                    elif game_state == 14:
+                            game_state = tmp_state_saver
+                        elif decoded_message["type"] == "TableDisbanded":
+                            joined_table_id = -1
+                            ready_to_begin_game = False
+                            game_state = 3
+                    elif game_state == 14 or game_state == 15:
                         joined_table_id = -1
                         ready_to_begin_game = False
                         game_state = 3
+
+
 
 client_socket.close()
