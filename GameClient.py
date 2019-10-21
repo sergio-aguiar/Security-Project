@@ -125,8 +125,10 @@ def in_table_not_leader():
             return 12, {"type": "ChangeReadyState", "table_id": joined_table_id, "ready": ready_to_begin_game}
         elif option == "2":
             return 13, {"type": "RequestTableInfo", "table_id": joined_table_id}
-        elif option == 3:
+        elif option == "3":
             return 14, {"type": "LeaveTable", "table_id": joined_table_id}
+        else:
+            print("[Client] Invalid choice! Try again.")
 
 
 def connect_to_server(game_socket, host, port):
@@ -216,7 +218,6 @@ while True:
         elif game_state == 8:
             game_state = 9
 
-
     else:
 
         read_sockets, write_socket, error_socket = select.select([client_socket], [], [])
@@ -269,6 +270,9 @@ while True:
                                                                                       decoded_message["players"]))
 
                         game_state = 10
-
+                    elif game_state == 14:
+                        joined_table_id = -1
+                        ready_to_begin_game = False
+                        game_state = 3
 
 client_socket.close()

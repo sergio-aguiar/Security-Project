@@ -55,11 +55,15 @@ def client_thread(socket_object, socket_address):
                                 sock["state"] = 7
                             elif received_message["type"] == "RequestTableInfo":
                                 sock["state"] = 8
+                            elif received_message["type"] == "LeaveTable":
+                                sock["state"] = 9
 
                             reply_to_client(socket_object, received_message, sock["state"])
 
                             if sock["state"] == 7 or sock["state"] == 8:
                                 sock["state"] = 5
+                            elif sock["state"] == 9:
+                                sock["state"] = 2
             else:
                 disconnect_from_client(socket_object)
         except:
@@ -144,6 +148,14 @@ def reply_to_client(client_sock, received_message, state):
                 "table": requested_table
             }
             client_sock.sendall(json.dumps(reply).encode("utf-8"))
+
+        elif state == 9:
+            leave_table_by_id(client_sock, received_message["table_id"])
+
+            reply = {
+                "type": "TableLeft"
+            }
+            client_sock.sendall(json.dumps(reply).encode("utf-8"))
     except:
         client_sock.close()
         disconnect_from_client(client_sock)
@@ -187,6 +199,16 @@ def join_table_by_id(client_sock, tid):
             table["player_num"] += 1
 
 
+def leave_table_by_id(client_sock, tid):
+
+    for table in tables:
+        if table["id"] == tid:
+            for player in table["players"]:
+                if player[0] == client_sock.getpeername():
+                    table["players"].remove(player)
+                    table["player_num"] -= 1
+
+
 def update_game_state_by_sock(sock, new_state):
 
     for state in game_states:
@@ -225,7 +247,7 @@ client_list = []
 # 6 - Attempting Random Table Assignment
 # 7 - Ready State Changed
 # 8 - Requesting Table Info
-#
+# 9 - Requesting to Leave a table
 game_states = []
 
 global_table_id = 0
