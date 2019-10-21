@@ -48,7 +48,19 @@ def client_thread(socket_object, socket_address):
                             reply_to_client(socket_object, received_message, sock["state"])
 
                             if sock["state"] == 3:
-                                sock["state"] = 2
+                                sock["state"] = 10
+                        elif sock["state"] == 10:
+                            if received_message["type"] == "ChangeReadyState":
+                                change_ready_state(socket_object, received_message["table_id"], received_message["ready"])
+                                sock["state"] = 11
+                            elif received_message["type"] == "RequestTableInfo":
+                                sock["state"] = 12
+
+                            reply_to_client(socket_object, received_message, sock["state"])
+
+                            if sock["state"] == 11 or sock["state"] == 12:
+                                sock["state"] = 10
+
                         elif sock["state"] == 5:
                             if received_message["type"] == "ChangeReadyState":
                                 change_ready_state(socket_object, received_message["table_id"], received_message["ready"])
@@ -90,7 +102,8 @@ def reply_to_client(client_sock, received_message, state):
 
         elif state == 3:
             reply = {
-                "type": "TableCreated"
+                "type": "TableCreated",
+                "table_id": get_table_id_by_leader_sock(client_sock)
             }
             client_sock.sendall(json.dumps(reply).encode("utf-8"))
 
@@ -133,14 +146,14 @@ def reply_to_client(client_sock, received_message, state):
             client_sock.sendall(json.dumps(reply).encode("utf-8"))
             print("[Server] Tables: %s" % str(tables))
 
-        elif state == 7:
+        elif state == 7 or state == 11:
             reply = {
                 "type": "ReadyStateChanged"
             }
             print("[Server] Tables: %s" % str(tables))
             client_sock.sendall(json.dumps(reply).encode("utf-8"))
 
-        elif state == 8:
+        elif state == 8 or state == 12:
             requested_table = get_table_by_id(received_message["table_id"])
 
             reply = {
@@ -232,22 +245,38 @@ def get_table_by_id(tid):
             return table
 
 
+def get_table_id_by_leader_sock(sock):
+
+    for table in tables:
+        if table["leader"] == sock.getpeername():
+            return table["id"]
+
+
 print("[Server] Initializing.")
 
 server_host, server_port = ("127.0.0.1", 1024)
 client_list = []
 
 # Current step in the game
-# 0 - Connected
-# 1 - Awaiting Acknowledge
-# 2 - Awaiting Menu Option
-# 3 - Table Created
-# 4 - Checking Open Table
-# 5 - Table Joined (not leader)
-# 6 - Attempting Random Table Assignment
-# 7 - Ready State Changed
-# 8 - Requesting Table Info
-# 9 - Requesting to Leave a table
+# 0  - Connected
+# 1  - Awaiting Acknowledge
+# 2  - Awaiting Menu Option
+# 3  - Table Created (leader)
+# 4  - Checking Open Table
+# 5  - Table Joined (not leader)
+# 6  - Attempting Random Table Assignment
+# 7  - Ready State Changed
+# 8  - Requesting Table Info
+# 9  - Requesting to Leave a table
+# 10 - Awaiting Table Leader Menu Option
+# 11 - Ready State Changed (Leader)
+# 12 - Requesting Table Info (Leader)
+#
+#
+#
+#
+#
+#
 game_states = []
 
 global_table_id = 0

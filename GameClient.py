@@ -45,7 +45,7 @@ def set_server_address():
 
 def client_init_menu(game_socket, host, port):
     option = -1
-    while option != 0:
+    while 1:
 
         print("\n[Client] Welcome to the game client!\n"
               "1- Configure croupier address\n"
@@ -72,7 +72,7 @@ def client_init_menu(game_socket, host, port):
 
 def client_table_menu(game_socket):
     option = -1
-    while option != 0:
+    while 1:
 
         print("\n[Client] Game lobby:\n"
               "1- Create table\n"
@@ -103,9 +103,10 @@ def client_table_menu(game_socket):
 def in_table_not_leader():
 
     global ready_to_begin_game
+    global tmp_state_saver
 
     option = -1
-    while option != 0:
+    while 1:
         menu_string = "\n[Client] Table operations:\n"\
                       "1- Flag self as "
 
@@ -122,10 +123,49 @@ def in_table_not_leader():
 
         if option == "1":
             ready_to_begin_game = not ready_to_begin_game
+            tmp_state_saver = game_state
             return 12, {"type": "ChangeReadyState", "table_id": joined_table_id, "ready": ready_to_begin_game}
         elif option == "2":
+            tmp_state_saver = game_state
             return 13, {"type": "RequestTableInfo", "table_id": joined_table_id}
         elif option == "3":
+            return 14, {"type": "LeaveTable", "table_id": joined_table_id}
+        else:
+            print("[Client] Invalid choice! Try again.")
+
+
+def in_table_leader():
+
+    global ready_to_begin_game
+    global tmp_state_saver
+
+    option = -1
+    while 1:
+        menu_string = "\n[Client] Table operations:\n" \
+                      "1- Start the game\n"\
+                      "2- Flag self as "
+
+        if ready_to_begin_game:
+            menu_string += "not ready\n"
+        else:
+            menu_string += "ready\n"
+
+        menu_string += "3- List table information\n"\
+                       "4- Disband table"
+
+        print(menu_string)
+        option = input("\nOption: ")
+
+        if option == "1":
+            return 15, {"type": "StartGame", "table_id": joined_table_id}
+        elif option == "2":
+            ready_to_begin_game = not ready_to_begin_game
+            tmp_state_saver = game_state
+            return 12, {"type": "ChangeReadyState", "table_id": joined_table_id, "ready": ready_to_begin_game}
+        elif option == "3":
+            tmp_state_saver = game_state
+            return 13, {"type": "RequestTableInfo", "table_id": joined_table_id}
+        elif option == "4":
             return 14, {"type": "LeaveTable", "table_id": joined_table_id}
         else:
             print("[Client] Invalid choice! Try again.")
@@ -185,6 +225,7 @@ send_buffer = [{
 #
 #
 game_state = 0
+tmp_state_saver = 0
 
 # Id of the currently joined table. Id valued at -1 means no table joined.
 joined_table_id = -1
@@ -198,6 +239,9 @@ while True:
 
     if game_state == 3:
         game_state, tmp_message = client_table_menu(client_socket)
+        send_buffer.append(tmp_message)
+    elif game_state == 5:
+        game_state, tmp_message = in_table_leader()
         send_buffer.append(tmp_message)
     elif game_state == 10:
         game_state, tmp_message = in_table_not_leader()
@@ -235,6 +279,8 @@ while True:
                         send_buffer.append({"type": "ConnectionAcknowledge"})
                         game_state = 2
                     elif game_state == 4:
+                        decoded_message = json.loads(received_message.decode("utf-8"))
+                        joined_table_id = decoded_message["table_id"]
                         game_state = 5
                     elif game_state == 7:
                         decoded_message = json.loads(received_message.decode("utf-8"))
@@ -261,7 +307,7 @@ while True:
                             game_state = 10
                             joined_table_id = decoded_message["table_id"]
                     elif game_state == 12:
-                        game_state = 10
+                        game_state = tmp_state_saver
                     elif game_state == 13:
                         decoded_message = json.loads(received_message.decode("utf-8"))["table"]
 
@@ -269,7 +315,7 @@ while True:
                                                                                       decoded_message["player_num"],
                                                                                       decoded_message["players"]))
 
-                        game_state = 10
+                        game_state = tmp_state_saver
                     elif game_state == 14:
                         joined_table_id = -1
                         ready_to_begin_game = False
