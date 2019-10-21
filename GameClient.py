@@ -236,10 +236,10 @@ while True:
                     elif game_state == 4:
                         game_state = 5
                     elif game_state == 7:
-                        joinable_tables = json.loads(received_message.decode("utf-8"))
+                        decoded_message = json.loads(received_message.decode("utf-8"))
 
                         print("\nList of joinable tables:")
-                        for table in joinable_tables["joinableTables"]:
+                        for table in decoded_message["joinableTables"]:
                             print("Table ID: %d,\tNumber of Players: %d,\tPlayers: %s" % (table["id"],
                                                                                           table["player_num"],
                                                                                           table["players"]))
@@ -261,5 +261,14 @@ while True:
                             joined_table_id = decoded_message["table_id"]
                     elif game_state == 12:
                         game_state = 10
+                    elif game_state == 13:
+                        decoded_message = json.loads(received_message.decode("utf-8"))["table"]
+
+                        print("\nTable ID: %d,\tNumber of Players: %d,\tPlayers: %s" % (decoded_message["id"],
+                                                                                      decoded_message["player_num"],
+                                                                                      decoded_message["players"]))
+
+                        game_state = 10
+
 
 client_socket.close()

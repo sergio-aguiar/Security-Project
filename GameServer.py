@@ -53,10 +53,12 @@ def client_thread(socket_object, socket_address):
                             if received_message["type"] == "ChangeReadyState":
                                 change_ready_state(socket_object, received_message["table_id"], received_message["ready"])
                                 sock["state"] = 7
+                            elif received_message["type"] == "RequestTableInfo":
+                                sock["state"] = 8
 
                             reply_to_client(socket_object, received_message, sock["state"])
 
-                            if sock["state"] == 7:
+                            if sock["state"] == 7 or sock["state"] == 8:
                                 sock["state"] = 5
             else:
                 disconnect_from_client(socket_object)
@@ -133,6 +135,15 @@ def reply_to_client(client_sock, received_message, state):
             }
             print("[Server] Tables: %s" % str(tables))
             client_sock.sendall(json.dumps(reply).encode("utf-8"))
+
+        elif state == 8:
+            requested_table = get_table_by_id(received_message["table_id"])
+
+            reply = {
+                "type": "ReturnTableInfo",
+                "table": requested_table
+            }
+            client_sock.sendall(json.dumps(reply).encode("utf-8"))
     except:
         client_sock.close()
         disconnect_from_client(client_sock)
@@ -192,6 +203,13 @@ def change_ready_state(sock, tid, ready):
                     player[1] = ready
 
 
+def get_table_by_id(tid):
+
+    for table in tables:
+        if table["id"] == tid:
+            return table
+
+
 print("[Server] Initializing.")
 
 server_host, server_port = ("127.0.0.1", 1024)
@@ -206,7 +224,7 @@ client_list = []
 # 5 - Table Joined (not leader)
 # 6 - Attempting Random Table Assignment
 # 7 - Ready State Changed
-#
+# 8 - Requesting Table Info
 #
 game_states = []
 
