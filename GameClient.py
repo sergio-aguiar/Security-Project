@@ -217,8 +217,8 @@ send_buffer = [{
 # 13 - Requesting table information
 # 14 - Requesting to leave Table
 # 15 - Requesting Table Disband
-#
-#
+# 16 - Requesting Game Start
+# 17 - Game Starting
 #
 #
 #
@@ -315,6 +315,9 @@ while True:
                             joined_table_id = -1
                             ready_to_begin_game = False
                             game_state = 3
+                        elif decoded_message["type"] == "GameAlreadyStarting":
+                            game_state = 17
+
                     elif game_state == 13:
                         decoded_message = json.loads(received_message.decode("utf-8"))
 
@@ -329,10 +332,30 @@ while True:
                             joined_table_id = -1
                             ready_to_begin_game = False
                             game_state = 3
+                        elif decoded_message["type"] == "GameAlreadyStarting":
+                            game_state = 17
                     elif game_state == 14 or game_state == 15:
-                        joined_table_id = -1
-                        ready_to_begin_game = False
-                        game_state = 3
+                        decoded_message = json.loads(received_message.decode("utf-8"))
+
+                        if decoded_message["type"] == "GameAlreadyStarting":
+                            print("\n[Client] Round Starting.")
+                            game_state = 17
+                        else:
+                            joined_table_id = -1
+                            ready_to_begin_game = False
+                            game_state = 3
+                    elif game_state == 16:
+                        decoded_message = json.loads(received_message.decode("utf-8"))
+
+                        if decoded_message["type"] == "GameStarting":
+                            print("\n[Client] Round Starting.")
+                            game_state = 17
+                        elif decoded_message["type"] == "InsufficientPlayers":
+                            print("\n[Client] Insufficient Players: %d" % decoded_message["player_num"])
+                            game_state = 5
+                        elif decoded_message["type"] == "InsufficientReadyPlayers":
+                            print("\n[Client] Insufficient Ready Players: %d" % decoded_message["ready_num"])
+                            game_state = 5
 
 
 
