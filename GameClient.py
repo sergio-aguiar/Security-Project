@@ -316,6 +316,7 @@ while True:
                             ready_to_begin_game = False
                             game_state = 3
                         elif decoded_message["type"] == "GameAlreadyStarting":
+                            print("\n[Client] Round Starting.")
                             game_state = 17
 
                     elif game_state == 13:
@@ -333,6 +334,7 @@ while True:
                             ready_to_begin_game = False
                             game_state = 3
                         elif decoded_message["type"] == "GameAlreadyStarting":
+                            print("\n[Client] Round Starting.")
                             game_state = 17
                     elif game_state == 14 or game_state == 15:
                         decoded_message = json.loads(received_message.decode("utf-8"))
