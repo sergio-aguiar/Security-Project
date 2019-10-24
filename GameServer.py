@@ -92,7 +92,9 @@ def client_thread(socket_object, socket_address):
                         elif sock["state"] == 14:
                             reply_to_client(socket_object, received_message, sock["state"])
 
-                        print(sock["state"])
+                        elif sock["state"] == 17:
+                            reply_to_client(socket_object, received_message, sock["state"])
+                            sock["state"] = 18
 
             else:
                 disconnect_from_client(socket_object)
@@ -237,6 +239,13 @@ def reply_to_client(client_sock, received_message, state):
                     }
                 update_game_state_by_sock(client_sock, 10)
                 client_sock.sendall(json.dumps(reply).encode("utf-8"))
+
+        elif state == 17:
+            reply = {
+                "type": "ClientsToConnectTo",
+                "clients": clients_to_connect(client_socket, received_message["table_id"])
+            }
+            client_sock.sendall(json.dumps(reply).encode("utf-8"))
 
     except:
         client_sock.close()
@@ -394,6 +403,17 @@ def table_broadcast(exception_list, tid, message):
                             sock.sendall(message)
 
 
+def clients_to_connect(sock, tid):
+    client_addresses = []
+
+    for table in tables:
+        if table["id"] == tid:
+            for player in table["players"]:
+                if player[0] != sock.getpeername():
+                    client_addresses.append(player[0])
+    return client_addresses
+
+
 print("[Server] Initializing.")
 
 server_host, server_port = ("127.0.0.1", 1024)
@@ -417,8 +437,8 @@ client_list = []
 # 14 - Removing from Disbanded Table
 # 15 - Verifying Game Ready State
 # 16 - Game About to Begin
-#
-#
+# 17 - Handling Client Inter-Connection
+# 18 - Awaiting Inter-Connection Finished
 game_states = []
 
 global_table_id = 0

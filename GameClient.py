@@ -196,6 +196,8 @@ def choose_table_id():
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server_host, server_port = ("", "")
 
+connected_sockets = [client_socket]
+
 send_buffer = [{
     "type": "ConnectionRequest"
 }]
@@ -219,7 +221,7 @@ send_buffer = [{
 # 15 - Requesting Table Disband
 # 16 - Requesting Game Start
 # 17 - Game Starting
-#
+# 18 - Starting Inter-Client Connections
 #
 #
 #
@@ -246,6 +248,9 @@ while True:
     elif game_state == 10:
         game_state, tmp_message = in_table_not_leader()
         send_buffer.append(tmp_message)
+    elif game_state == 17:
+        game_state = 18
+        send_buffer.append({"type": "ClientsToConnect", "table_id": joined_table_id})
 
     if send_buffer:
         client_socket.sendall(json.dumps(send_buffer[0]).encode("utf-8"))
@@ -264,7 +269,7 @@ while True:
 
     else:
 
-        read_sockets, write_socket, error_socket = select.select([client_socket], [], [])
+        read_sockets, write_socket, error_socket = select.select(connected_sockets, [], [])
 
         for sock in read_sockets:
 
@@ -358,7 +363,8 @@ while True:
                         elif decoded_message["type"] == "InsufficientReadyPlayers":
                             print("\n[Client] Insufficient Ready Players: %d" % decoded_message["ready_num"])
                             game_state = 5
-
-
+                    elif game_state == 17:
+                        decoded_message = json.loads(received_message.decode("utf-8"))
+                        
 
 client_socket.close()
